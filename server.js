@@ -17,22 +17,61 @@ mongoose.connect(process.env.MONGODB_URI)
     process.exit(1);
   });
 
-// Importar rutas
-const productRoutes = require('./routes/products');
-const categoryRoutes = require('./routes/categories');
-const authRoutes = require('./routes/auth');
-const cartRoutes = require('./routes/cart'); // Nueva ruta del carrito
+// Importar y verificar rutas una por una
+console.log('🔍 Verificando rutas...');
 
-// Usar rutas
-app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/cart', cartRoutes); // Agregar esta línea DESPUÉS de definir app
+// 1. Products (este sabemos que funciona)
+try {
+  const productRoutes = require('./routes/products');
+  console.log('✅ Products route OK');
+  app.use('/api/products', productRoutes);
+} catch (error) {
+  console.log('❌ Error en products:', error.message);
+}
+
+// 2. Categories
+try {
+  const categoryRoutes = require('./routes/categories');
+  console.log('✅ Categories route OK');
+  app.use('/api/categories', categoryRoutes);
+} catch (error) {
+  console.log('❌ Error en categories:', error.message);
+  console.log('💡 Creando ruta temporal para categories...');
+  const tempRouter = express.Router();
+  tempRouter.get('/', (req, res) => res.json({ message: 'Categories temporal' }));
+  app.use('/api/categories', tempRouter);
+}
+
+// 3. Auth
+try {
+  const authRoutes = require('./routes/auth');
+  console.log('✅ Auth route OK');
+  app.use('/api/auth', authRoutes);
+} catch (error) {
+  console.log('❌ Error en auth:', error.message);
+  console.log('💡 Creando ruta temporal para auth...');
+  const tempRouter = express.Router();
+  tempRouter.post('/login', (req, res) => res.json({ message: 'Login temporal' }));
+  app.use('/api/auth', tempRouter);
+}
+
+// 4. Cart
+try {
+  const cartRoutes = require('./routes/cart');
+  console.log('✅ Cart route OK');
+  app.use('/api/cart', cartRoutes);
+} catch (error) {
+  console.log('❌ Error en cart:', error.message);
+  console.log('💡 Creando ruta temporal para cart...');
+  const tempRouter = express.Router();
+  tempRouter.get('/', (req, res) => res.json({ message: 'Cart temporal' }));
+  app.use('/api/cart', tempRouter);
+}
 
 // Ruta principal
 app.get('/', (req, res) => {
   res.json({ 
-    message: '🚀 API de By Luciana con Carrito!',
+    message: '🚀 API de By Luciana funcionando!',
     database: 'MongoDB Atlas Cloud',
     endpoints: {
       auth: '/api/auth',
@@ -48,8 +87,6 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK',
     database: mongoose.connection.readyState === 1 ? 'Conectado' : 'Desconectado',
-    authentication: 'JWT Configurado',
-    cart: 'Sistema de carrito activo',
     timestamp: new Date().toISOString()
   });
 });
@@ -75,6 +112,4 @@ app.use((error, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🎯 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`🔐 Autenticación JWT configurada`);
-  console.log(`🛒 Sistema de carrito activo`);
 });

@@ -25,6 +25,10 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.get('/', (req, res) => {
+  res.json({ message: 'Categorías funcionando' });
+});
+
 // POST /api/categories - Crear nueva categoría
 router.post('/', async (req, res) => {
   try {

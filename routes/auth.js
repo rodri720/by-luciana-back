@@ -8,6 +8,8 @@ router.post('/register', register);
 
 // Login
 router.post('/login', login);
+// Tus rutas de auth aquí
+
 
 // Perfil (requiere autenticación)
 router.get('/profile', auth, getProfile);
