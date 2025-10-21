@@ -3,13 +3,12 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
+// Inicializar app PRIMERO
 const app = express();
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
-// Conexión a MongoDB
-
 
 // Conexión a MongoDB Atlas
 mongoose.connect(process.env.MONGODB_URI)
@@ -70,6 +69,19 @@ try {
   app.use('/api/cart', tempRouter);
 }
 
+// 5. Newsletter - AGREGAR DESPUÉS DE app = express()
+try {
+  const newsletterRoutes = require('./routes/newsletter');
+  console.log('✅ Newsletter route OK');
+  app.use('/api/newsletter', newsletterRoutes);
+} catch (error) {
+  console.log('❌ Error en newsletter:', error.message);
+  console.log('💡 Creando ruta temporal para newsletter...');
+  const tempRouter = express.Router();
+  tempRouter.post('/subscribe', (req, res) => res.json({ message: 'Newsletter temporal' }));
+  app.use('/api/newsletter', tempRouter);
+}
+
 // Ruta principal
 app.get('/', (req, res) => {
   res.json({ 
@@ -79,7 +91,8 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       cart: '/api/cart',
       products: '/api/products',
-      categories: '/api/categories'
+      categories: '/api/categories',
+      newsletter: '/api/newsletter'
     }
   });
 });
