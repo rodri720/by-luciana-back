@@ -1,7 +1,38 @@
 const Product = require('../models/Product');
 const upload = require('../middleware/upload');
+const multer = require('multer');
+const path = require('path');
 
-// Obtener todos los productos con paginación
+// Configuración de multer para upload individual (compatible con tu middleware existente)
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueName + path.extname(file.originalname));
+  }
+});
+
+const singleUpload = multer({ 
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB límite
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|webp|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes (JPEG, PNG, WebP, GIF)'));
+    }
+  }
+}).single('image');
+
+// 🟡 TUS FUNCIONES EXISTENTES (se mantienen igual)
 exports.getProducts = async (req, res) => {
   try {
     const { category, featured, page = 1, limit = 12 } = req.query;
@@ -29,7 +60,6 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-// Obtener producto por ID
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -44,7 +74,6 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-// Obtener todos los productos (sin paginación)
 exports.getAllProducts = async (req, res) => {
   try {
     const products = await Product.find({ active: true })
@@ -57,10 +86,8 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
-// Crear nuevo producto CON SUBIDA DE IMÁGENES
 exports.createProduct = async (req, res) => {
   try {
-    // Usar multer para manejar la subida de archivos
     upload.array('images', 5)(req, res, async function (err) {
       if (err) {
         return res.status(400).json({ error: 'Error al subir imágenes: ' + err.message });
@@ -69,7 +96,6 @@ exports.createProduct = async (req, res) => {
       try {
         const productData = { ...req.body };
         
-        // Procesar imágenes si se subieron
         if (req.files && req.files.length > 0) {
           productData.images = req.files.map(file => `/uploads/${file.filename}`);
         }
@@ -96,7 +122,6 @@ exports.createProduct = async (req, res) => {
 
         const product = new Product(productData);
         
-        // Generar SKU automático si no se proporciona
         if (!product.sku) {
           const count = await Product.countDocuments();
           product.sku = `BL${String(count + 1).padStart(4, '0')}`;
@@ -113,10 +138,8 @@ exports.createProduct = async (req, res) => {
   }
 };
 
-// Actualizar producto CON SUBIDA DE IMÁGENES
 exports.updateProduct = async (req, res) => {
   try {
-    // Usar multer para manejar la subida de archivos
     upload.array('images', 5)(req, res, async function (err) {
       if (err) {
         return res.status(400).json({ error: 'Error al subir imágenes: ' + err.message });
@@ -125,12 +148,9 @@ exports.updateProduct = async (req, res) => {
       try {
         const updateData = { ...req.body };
 
-        // Procesar nuevas imágenes si se subieron
         if (req.files && req.files.length > 0) {
           const newImages = req.files.map(file => `/uploads/${file.filename}`);
           
-          // Si se quiere reemplazar todas las imágenes, usar solo las nuevas
-          // Si se quiere agregar a las existentes, obtener el producto actual primero
           if (updateData.replaceImages === 'true') {
             updateData.images = newImages;
           } else {
@@ -183,7 +203,6 @@ exports.updateProduct = async (req, res) => {
   }
 };
 
-// Eliminar producto (soft delete) - SIN CAMBIOS
 exports.deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndUpdate(
@@ -197,6 +216,112 @@ exports.deleteProduct = async (req, res) => {
     }
     
     res.json({ message: 'Producto eliminado correctamente' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 🆕 NUEVAS FUNCIONES PARA UPLOAD INDIVIDUAL
+exports.uploadProductImage = async (req, res) => {
+  try {
+    singleUpload(req, res, async function (err) {
+      if (err) {
+        return res.status(400).json({ error: 'Error al subir imagen: ' + err.message });
+      }
+
+      // Verificar que se subió un archivo
+      if (!req.file) {
+        return res.status(400).json({ error: 'No se seleccionó ninguna imagen' });
+      }
+
+      try {
+        const product = await Product.findById(req.params.id);
+        if (!product) {
+          return res.status(404).json({ error: 'Producto no encontrado' });
+        }
+
+        // Agregar la nueva imagen al array de imágenes
+        const newImage = `/uploads/${req.file.filename}`;
+        if (!product.images) {
+          product.images = [newImage];
+        } else {
+          product.images.push(newImage);
+        }
+        
+        await product.save();
+
+        res.json({ 
+          message: 'Imagen subida correctamente',
+          imageUrl: newImage,
+          images: product.images // Devolver todas las imágenes
+        });
+      } catch (error) {
+        res.status(500).json({ error: 'Error al guardar la imagen: ' + error.message });
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 🆕 ELIMINAR IMAGEN ESPECÍFICA
+exports.deleteProductImage = async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'URL de imagen no proporcionada' });
+    }
+
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    // Filtrar la imagen a eliminar
+    if (product.images && product.images.length > 0) {
+      product.images = product.images.filter(img => img !== imageUrl);
+      await product.save();
+    }
+
+    res.json({ 
+      message: 'Imagen eliminada correctamente',
+      images: product.images
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 🆕 ESTABLECER IMAGEN PRINCIPAL
+exports.setMainImage = async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'URL de imagen no proporcionada' });
+    }
+
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+
+    // Verificar que la imagen existe en el array
+    if (!product.images || !product.images.includes(imageUrl)) {
+      return res.status(400).json({ error: 'La imagen no existe en el producto' });
+    }
+
+    // Mover la imagen principal al inicio del array
+    product.images = product.images.filter(img => img !== imageUrl);
+    product.images.unshift(imageUrl);
+    
+    await product.save();
+
+    res.json({ 
+      message: 'Imagen principal establecida correctamente',
+      images: product.images
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
