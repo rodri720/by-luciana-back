@@ -20,10 +20,11 @@ const productSchema = new mongoose.Schema({
     min: 0
   },
   category: {
-    type: String,
-    required: true,
-    enum: ['oulet', 'novedades', 'mayorista', 'accesorios', 'calzados', 'bodys']
-  },
+  type: String,
+  required: true,
+  enum: ['outlet', 'novedades', 'mayorista', 'accesorios', 'calzados', 'bodys']
+  //      ↑ CORREGIDO: 'outlet' en lugar de 'oulet'
+},
   images: [{
     type: String
   }],

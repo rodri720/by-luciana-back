@@ -3,7 +3,7 @@ const upload = require('../middleware/upload');
 const multer = require('multer');
 const path = require('path');
 
-// Configuración de multer para upload individual (compatible con tu middleware existente)
+// Configuración de multer para upload individual
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -32,7 +32,7 @@ const singleUpload = multer({
   }
 }).single('image');
 
-// 🟡 TUS FUNCIONES EXISTENTES (se mantienen igual)
+// 🟡 FUNCIONES EXISTENTES
 exports.getProducts = async (req, res) => {
   try {
     const { category, featured, page = 1, limit = 12 } = req.query;
@@ -86,119 +86,139 @@ exports.getAllProducts = async (req, res) => {
   }
 };
 
+// 🟡 FUNCIÓN CREATE PRODUCT CORREGIDA - VERSIÓN DEFINITIVA
+// En productsController.js - createProduct
 exports.createProduct = async (req, res) => {
   try {
-    upload.array('images', 5)(req, res, async function (err) {
-      if (err) {
-        return res.status(400).json({ error: 'Error al subir imágenes: ' + err.message });
-      }
+    console.log('🔄 createProduct llamado en backend');
+    console.log('📝 Headers:', req.headers['content-type']);
+    
+    // 🔍 DEBUG EXTENDIDO
+    console.log('📦 req.body:', req.body);
+    console.log('🔍 Tipo de req.body:', typeof req.body);
+    console.log('🖼️ req.files:', req.files);
+    console.log('📊 Número de files:', req.files ? req.files.length : 0);
+    
+    // ✅ VERIFICACIÓN TEMPORAL - SIEMPRE CONTINUAR
+    if (!req.body) {
+      console.log('⚠️ req.body está undefined, creando objeto vacío');
+      req.body = {};
+    }
 
-      try {
-        const productData = { ...req.body };
-        
-        if (req.files && req.files.length > 0) {
-          productData.images = req.files.map(file => `/uploads/${file.filename}`);
-        }
+    const productData = { ...req.body };
+    
+    console.log('🔍 Datos del producto después de verificación:', productData);
 
-        // Procesar arrays si vienen como strings
-        if (productData.sizes && typeof productData.sizes === 'string') {
-          productData.sizes = productData.sizes.split(',').map(s => s.trim()).filter(s => s);
-        }
-        if (productData.colors && typeof productData.colors === 'string') {
-          productData.colors = productData.colors.split(',').map(c => c.trim()).filter(c => c);
-        }
-        if (productData.tags && typeof productData.tags === 'string') {
-          productData.tags = productData.tags.split(',').map(t => t.trim()).filter(t => t);
-        }
+    // 🖼️ Procesar imágenes si hay archivos
+    if (req.files && req.files.length > 0) {
+      console.log('✅ Procesando', req.files.length, 'imágenes...');
+      productData.images = req.files.map(file => `/uploads/${file.filename}`);
+      console.log('🖼️ URLs de imágenes generadas:', productData.images);
+    } else {
+      console.log('⚠️ No se recibieron archivos de imagen');
+      productData.images = [];
+    }
 
-        // Convertir tipos numéricos
-        if (productData.price) productData.price = parseFloat(productData.price);
-        if (productData.comparePrice) productData.comparePrice = parseFloat(productData.comparePrice);
-        if (productData.stock) productData.stock = parseInt(productData.stock);
-        
-        // Convertir booleanos
-        if (productData.featured) productData.featured = productData.featured === 'true';
-        if (productData.active) productData.active = productData.active !== 'false';
+    // 🎯 VALIDACIONES BÁSICAS
+    if (!productData.name) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+    
+    if (!productData.description) {
+      return res.status(400).json({ error: 'La descripción es requerida' });
+    }
+    
+    if (!productData.price) {
+      return res.status(400).json({ error: 'El precio es requerido' });
+    }
 
-        const product = new Product(productData);
-        
-        if (!product.sku) {
-          const count = await Product.countDocuments();
-          product.sku = `BL${String(count + 1).padStart(4, '0')}`;
-        }
-        
-        await product.save();
-        res.status(201).json(product);
-      } catch (error) {
-        res.status(400).json({ error: error.message });
-      }
+    console.log('📦 Datos finales para crear producto:', productData);
+
+    // 💾 Crear producto (simplificado para testing)
+    const product = new Product({
+      name: productData.name,
+      description: productData.description,
+      price: parseFloat(productData.price),
+      category: productData.category || 'general',
+      stock: parseInt(productData.stock) || 0,
+      featured: productData.featured === 'true',
+      images: productData.images,
+      active: true
     });
+    
+    await product.save();
+    console.log('✅ Producto guardado en BD:', product._id);
+    
+    res.status(201).json(product);
+    
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error en createProduct:', error);
+    res.status(500).json({ 
+      error: 'Error interno: ' + error.message 
+    });
   }
 };
-
+// 🟡 UPDATE PRODUCT (versión simplificada)
 exports.updateProduct = async (req, res) => {
   try {
-    upload.array('images', 5)(req, res, async function (err) {
-      if (err) {
-        return res.status(400).json({ error: 'Error al subir imágenes: ' + err.message });
+    console.log('🔄 updateProduct llamado en backend');
+    
+    // ✅ Verificación crítica
+    if (!req.body) {
+      return res.status(400).json({ error: 'Datos del producto no recibidos' });
+    }
+
+    const updateData = { ...req.body };
+
+    // 🖼️ Procesar nuevas imágenes si hay archivos
+    if (req.files && req.files.length > 0) {
+      const newImages = req.files.map(file => `/uploads/${file.filename}`);
+      
+      if (updateData.replaceImages === 'true') {
+        updateData.images = newImages;
+      } else {
+        const currentProduct = await Product.findById(req.params.id);
+        if (currentProduct && currentProduct.images) {
+          updateData.images = [...currentProduct.images, ...newImages];
+        } else {
+          updateData.images = newImages;
+        }
       }
+    }
 
-      try {
-        const updateData = { ...req.body };
+    // 🔄 Procesar arrays si vienen como strings
+    if (updateData.sizes && typeof updateData.sizes === 'string') {
+      updateData.sizes = updateData.sizes.split(',').map(s => s.trim()).filter(s => s);
+    }
+    if (updateData.colors && typeof updateData.colors === 'string') {
+      updateData.colors = updateData.colors.split(',').map(c => c.trim()).filter(c => c);
+    }
+    if (updateData.tags && typeof updateData.tags === 'string') {
+      updateData.tags = updateData.tags.split(',').map(t => t.trim()).filter(t => t);
+    }
 
-        if (req.files && req.files.length > 0) {
-          const newImages = req.files.map(file => `/uploads/${file.filename}`);
-          
-          if (updateData.replaceImages === 'true') {
-            updateData.images = newImages;
-          } else {
-            const currentProduct = await Product.findById(req.params.id);
-            if (currentProduct && currentProduct.images) {
-              updateData.images = [...currentProduct.images, ...newImages];
-            } else {
-              updateData.images = newImages;
-            }
-          }
-        }
+    // 💰 Convertir tipos numéricos
+    if (updateData.price) updateData.price = parseFloat(updateData.price);
+    if (updateData.comparePrice) updateData.comparePrice = parseFloat(updateData.comparePrice);
+    if (updateData.stock) updateData.stock = parseInt(updateData.stock);
+    
+    // ✅ Convertir booleanos
+    if (updateData.featured) updateData.featured = updateData.featured === 'true';
+    if (updateData.active) updateData.active = updateData.active !== 'false';
 
-        // Procesar arrays si vienen como strings
-        if (updateData.sizes && typeof updateData.sizes === 'string') {
-          updateData.sizes = updateData.sizes.split(',').map(s => s.trim()).filter(s => s);
-        }
-        if (updateData.colors && typeof updateData.colors === 'string') {
-          updateData.colors = updateData.colors.split(',').map(c => c.trim()).filter(c => c);
-        }
-        if (updateData.tags && typeof updateData.tags === 'string') {
-          updateData.tags = updateData.tags.split(',').map(t => t.trim()).filter(t => t);
-        }
-
-        // Convertir tipos numéricos
-        if (updateData.price) updateData.price = parseFloat(updateData.price);
-        if (updateData.comparePrice) updateData.comparePrice = parseFloat(updateData.comparePrice);
-        if (updateData.stock) updateData.stock = parseInt(updateData.stock);
-        
-        // Convertir booleanos
-        if (updateData.featured) updateData.featured = updateData.featured === 'true';
-        if (updateData.active) updateData.active = updateData.active !== 'false';
-
-        const product = await Product.findByIdAndUpdate(
-          req.params.id,
-          updateData,
-          { new: true, runValidators: true }
-        );
-        
-        if (!product) {
-          return res.status(404).json({ error: 'Producto no encontrado' });
-        }
-        
-        res.json(product);
-      } catch (error) {
-        res.status(400).json({ error: error.message });
-      }
-    });
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!product) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+    
+    res.json(product);
   } catch (error) {
+    console.error('❌ Error en updateProduct:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -221,7 +241,7 @@ exports.deleteProduct = async (req, res) => {
   }
 };
 
-// 🆕 NUEVAS FUNCIONES PARA UPLOAD INDIVIDUAL
+// 🆕 FUNCIONES PARA UPLOAD INDIVIDUAL
 exports.uploadProductImage = async (req, res) => {
   try {
     singleUpload(req, res, async function (err) {
@@ -253,7 +273,7 @@ exports.uploadProductImage = async (req, res) => {
         res.json({ 
           message: 'Imagen subida correctamente',
           imageUrl: newImage,
-          images: product.images // Devolver todas las imágenes
+          images: product.images
         });
       } catch (error) {
         res.status(500).json({ error: 'Error al guardar la imagen: ' + error.message });
