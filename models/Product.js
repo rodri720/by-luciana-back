@@ -22,7 +22,7 @@ const productSchema = new mongoose.Schema({
   category: {
   type: String,
   required: true,
-  enum: ['outlet', 'novedades', 'mayorista', 'accesorios', 'calzados', 'bodys']
+  enum: ['outlet', 'novedades', 'mayorista', 'feriantes', 'calzados', 'bodys']
   //      ↑ CORREGIDO: 'outlet' en lugar de 'oulet'
 },
   images: [{

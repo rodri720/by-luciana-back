@@ -80,7 +80,7 @@ const seedProducts = async () => {
         name: "Collar Plata Sterling",
         description: "Elegante collar de plata sterling con diseño minimalista",
         price: 12900,
-        category: "accesorios",
+        category: "feriantes",
         stock: 50,
         sizes: ["Única"],
         colors: ["Plata"],
