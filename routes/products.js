@@ -1,11 +1,11 @@
-// routes/products.js - VERSIÓN CORREGIDA
+// routes/products.js - VERSIÓN CORREGIDA Y FUNCIONAL
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const productsController = require('../controllers/productsController');
 
-// ✅ CONFIGURAR MULTER DIRECTAMENTE EN LAS RUTAS
+// ✅ CONFIGURAR MULTER
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -16,18 +16,28 @@ const storage = multer.diskStorage({
   }
 });
 
-// ✅ CONFIGURACIÓN SIMPLIFICADA DE MULTER
 const upload = multer({ 
   storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
-  }
-  // ❌ NO USAR fileFilter por ahora para debugging
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-// ✅ RUTAS CON MULTER
+// 🔥 ORDEN CORRECTO: Rutas GET PRIMERO (sin multer)
+router.get('/', productsController.getProducts);
+router.get('/all', productsController.getAllProducts);
+router.get('/:id', productsController.getProductById);
+
+// 🛠️ Ruta de DEBUG para verificar que las rutas funcionan
+router.get('/debug/test', (req, res) => {
+  res.json({ 
+    message: '✅ Ruta products funcionando',
+    timestamp: new Date().toISOString(),
+    status: 'OK'
+  });
+});
+
+// 🖼️ Rutas con multer DESPUÉS de las GET
 router.post('/', 
-  upload.array('images', 5), // ✅ Esto procesa tanto archivos como campos
+  upload.array('images', 5),
   productsController.createProduct
 );
 
@@ -36,10 +46,7 @@ router.put('/:id',
   productsController.updateProduct
 );
 
-// Las otras rutas...
-router.get('/', productsController.getProducts);
-router.get('/all', productsController.getAllProducts);
-router.get('/:id', productsController.getProductById);
+// 🗑️ Rutas sin archivos
 router.delete('/:id', productsController.deleteProduct);
 
 module.exports = router;
