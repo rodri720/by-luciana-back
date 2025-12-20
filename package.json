@@ -10,17 +10,19 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "��#\u0000 \u0000b\u0000y\u0000-\u0000l\u0000u\u0000c\u0000i\u0000a\u0000n\u0000a\u0000-\u0000b\u0000a\u0000c\u0000k\u0000\r\u0000 \u0000",
   "dependencies": {
+    "axios": "^1.13.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "google-auth-library": "^10.4.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.19.1",
+    "mercadopago": "^2.11.0",
+    "mongoose": "^8.20.3",
     "multer": "^2.0.2",
-    "nodemailer": "^7.0.9"
+    "nodemailer": "^7.0.11"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
