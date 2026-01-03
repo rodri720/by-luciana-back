@@ -1,3 +1,4 @@
+// server.js - COMMONJS VERSION
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -22,15 +23,15 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 🆕 SERVIR ARCHIVOS ESTÁTICOS
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Crear carpeta uploads si no existe
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   console.log('📁 Carpeta uploads creada:', uploadsDir);
 }
+
+// SERVIR ARCHIVOS ESTÁTICOS
+app.use('/uploads', express.static(uploadsDir));
 
 // Conexión a MongoDB Atlas
 mongoose.connect(process.env.MONGODB_URI, {
@@ -54,8 +55,24 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-// Importar rutas
+// Importar rutas con CommonJS (require)
 console.log('🔍 Configurando rutas...');
+
+// 0. ✅ Upload Routes
+try {
+  const uploadRoutes = require('./routes/uploadRoutes');
+  console.log('✅ Upload routes OK');
+  app.use('/api/uploads', uploadRoutes);
+} catch (error) {
+  console.error('❌ Error en uploadRoutes:', error.message);
+  // Crear ruta temporal para uploads
+  const tempUploadRouter = express.Router();
+  tempUploadRouter.get('/', (req, res) => res.json({ 
+    message: 'Sistema de uploads temporal',
+    note: 'Configura las rutas de upload'
+  }));
+  app.use('/api/uploads', tempUploadRouter);
+}
 
 // 1. Products
 try {
@@ -102,7 +119,7 @@ try {
   console.log('❌ Error en newsletter:', error.message);
 }
 
-// 6. 🆕 MERCADO PAGO ROUTES (NUEVO)
+// 6. MERCADO PAGO ROUTES
 try {
   const paymentRoutes = require('./routes/paymentRoutes');
   console.log('✅ MercadoPago routes OK');
@@ -121,7 +138,7 @@ try {
   app.use('/api/payments', tempPaymentRouter);
 }
 
-// 7. 🆕 ORDERS ROUTES
+// 7. ORDERS ROUTES
 try {
   const orderRoutes = require('./routes/orders');
   console.log('✅ Orders route OK');
@@ -203,20 +220,22 @@ app.get('/api/test/email', async (req, res) => {
     });
   }
 });
-// Ruta principal - ACTUALIZADA con info de pagos
+
+// Ruta principal
 app.get('/', (req, res) => {
   res.json({ 
     message: '🚀 API de By Luciana funcionando!',
     version: '2.0.0',
     features: {
       database: 'MongoDB Atlas Cloud',
-      uploads: 'Sistema de imágenes activado',
+      uploads: 'Sistema de imágenes activado ✅',
       payments: 'MercadoPago integrado ✅',
       email: 'Sistema de facturas activo',
       environment: process.env.NODE_ENV,
       mercadoPago: process.env.MP_PRODUCTION_MODE === 'true' ? 'Producción' : 'Sandbox (Pruebas)'
     },
     endpoints: {
+      uploads: '/api/uploads',
       auth: '/api/auth',
       cart: '/api/cart',
       products: '/api/products',
@@ -225,24 +244,20 @@ app.get('/', (req, res) => {
       payments: '/api/payments',
       orders: '/api/orders'
     },
-    paymentEndpoints: {
-      createPreference: 'POST /api/payments/create-preference',
-      success: 'GET /api/payments/success',
-      failure: 'GET /api/payments/failure',
-      pending: 'GET /api/payments/pending',
-      webhook: 'POST /api/payments/webhook',
-      methods: 'GET /api/payments/methods',
-      orderStatus: 'GET /api/payments/order/:id'
+    uploadEndpoints: {
+      uploadMultipleImages: 'POST /api/uploads/upload-images',
+      uploadSingleImage: 'POST /api/uploads/image',
+      checkStatus: 'GET /api/uploads/status'
     },
     storeInfo: {
-      name: process.env.STORE_NAME || 'LUTEST',
+      name: process.env.STORE_NAME || 'By Luciana',
       email: process.env.STORE_EMAIL,
       whatsapp: process.env.STORE_WHATSAPP
     }
   });
 });
 
-// Ruta de salud - ACTUALIZADA
+// Ruta de salud
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK',
@@ -261,7 +276,6 @@ app.get('/api/health', (req, res) => {
 
 // Ruta para verificar configuración de MercadoPago
 app.get('/api/config/mp', (req, res) => {
-  // No exponer el access token completo por seguridad
   const maskedToken = process.env.MP_ACCESS_TOKEN ? 
     process.env.MP_ACCESS_TOKEN.substring(0, 10) + '...' : 
     'No configurado';
@@ -346,6 +360,8 @@ app.use((req, res) => {
       'GET /api/config/mp',
       'GET /api/test/mp',
       'GET /api/uploads/status',
+      'POST /api/uploads/upload-images',
+      'POST /api/uploads/image',
       'POST /api/payments/create-preference',
       'GET /api/payments/success',
       'GET /api/payments/methods',
@@ -381,18 +397,20 @@ const server = app.listen(PORT, () => {
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
 ║    🚀 BY LUCIANA E-COMMERCE API                      ║
-║    Versión: 2.0.0 (Con MercadoPago)                  ║
+║    Versión: 2.0.0 (Con Uploads & MercadoPago)        ║
 ║                                                       ║
 ╠═══════════════════════════════════════════════════════╣
 ║                                                       ║
 ║    ✅ Servidor corriendo en: http://localhost:${PORT}   ║
 ║    📁 Uploads: ${uploadsDir}                           ║
+║    📤 Endpoint: POST /api/uploads/upload-images       ║
 ║    💳 MercadoPago: ${process.env.MP_PRODUCTION_MODE === 'true' ? 'PRODUCCIÓN' : 'SANDBOX (Pruebas)'} ║
 ║    📧 Email: ${process.env.EMAIL_USER ? 'Configurado' : 'No configurado'} ║
 ║    🌐 Ngrok: ${process.env.NGROK_URL || 'No configurado'} ║
 ║                                                       ║
 ║    🔗 Verificar: http://localhost:${PORT}/api/health    ║
 ║    💰 MP Config: http://localhost:${PORT}/api/config/mp ║
+║    📤 Upload Status: http://localhost:${PORT}/api/uploads/status ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
   `);
@@ -419,6 +437,6 @@ process.on('SIGINT', () => {
     console.log('✅ Servidor apagado correctamente');
     process.exit(0);
   });
-});
+}); 
 
 module.exports = app;

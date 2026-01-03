@@ -5,11 +5,16 @@ const Order = require('../models/Order');
 const { sendInvoiceEmail } = require('../utils/emailService');
 
 // Configurar cliente de MercadoPago
+// Configurar cliente de MercadoPago CON MODO SANDBOX EXPLÍCITO
 const client = new MercadoPagoConfig({ 
   accessToken: process.env.MP_ACCESS_TOKEN,
-  options: { timeout: 5000 }
+  options: { 
+    timeout: 5000,
+    // ✅ AÑADE ESTA CONFIGURACIÓN CRÍTICA:
+    sandbox: process.env.MP_PRODUCTION_MODE !== 'true', // true para sandbox
+    integrator_id: process.env.STORE_NAME || 'LUTEST'
+  }
 });
-
 const payment = new Payment(client);
 const preference = new Preference(client);
 
